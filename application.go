@@ -16,6 +16,19 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+var index = `<html>
+<head>
+   	<title>Upload file</title>
+</head>
+<body>
+<form enctype="multipart/form-data" action="/upload" method="post">
+	<input type="file" name="file" />
+	<input type="hidden" name="token" value="{{.}}"/>
+	<input type="submit" value="upload" />
+</form>
+</body>
+</html>`
+
 var (
 	region     = "us-east-1"        //os.Getenv("AWS_REGION")
 	bucketName = "jazar-testbucket" //os.Getenv("BUCKET_NAME")
@@ -131,7 +144,7 @@ func main() {
 	const indexPage = "public/index.html"
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Serving %s to %s...\n", indexPage, r.RemoteAddr)
-		http.ServeFile(w, r, indexPage)
+		w.Write([]byte(index))
 	})
 
 	http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
@@ -149,7 +162,7 @@ func main() {
 			w.Write(jData)
 		} else {
 			log.Printf("Serving %s to %s...\n", indexPage, r.RemoteAddr)
-			http.ServeFile(w, r, indexPage)
+			w.Write([]byte(index))
 		}
 	})
 	log.Printf("Listening on port %s\n\n", port)
