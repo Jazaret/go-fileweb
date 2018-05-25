@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -101,6 +103,33 @@ func UploadFileToS3(file []byte, fileName string) string {
 	return u1
 }
 
+//GetFileFromS3 gets the file from s3 using GetObject
+func GetFileFromS3(fileDir string) {
+	key := fileDir
+
+	result, err := s3.New(awsSession).GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	})
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	out, err := os.Create(fileDir)
+
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	io.Copy(out, result.Body)
+	result.Body.Close()
+}
+
 func ReceiveFile(w http.ResponseWriter, r *http.Request) string {
 	// in your case file would be fileupload
 	file, header, err := r.FormFile("file")
@@ -120,6 +149,35 @@ func ReceiveFile(w http.ResponseWriter, r *http.Request) string {
 	result := UploadFileToS3(buffer, header.Filename)
 
 	return result
+}
+
+func downloadFile(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Path
+	if true {
+		key = "upload2.txt"
+	}
+
+	result, err := s3.New(awsSession).GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	})
+
+	if err != nil {
+		log.Printf("Error on GetObject %s\n", err)
+		log.Fatal(err)
+	}
+
+	fileName := *result.Metadata["File-Name"]
+	//uuid := *result.Metadata["Uuid"]
+
+	//Get c
+	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
+	w.Header().Set("Content-Type", *result.ContentType)
+	w.Header().Set("Content-Length", strconv.FormatInt(*result.ContentLength, 10))
+
+	io.Copy(w, result.Body)
+
+	defer result.Body.Close()
 }
 
 func init() {
@@ -165,6 +223,9 @@ func main() {
 			w.Write([]byte(index))
 		}
 	})
+
+	http.HandleFunc("/download/", downloadFile)
+
 	log.Printf("Listening on port %s\n\n", port)
 	http.ListenAndServe(":"+port, nil)
 }
