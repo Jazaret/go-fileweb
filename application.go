@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -77,9 +78,9 @@ func PutTagsOnS3Object(key, uuid, fileName string) {
 }
 
 func UploadFileToS3(file []byte, fileName string) string {
-	key := fileName
 	u1 := uuid.Must(uuid.NewV4()).String()
 	size := int64(len(file))
+	key := u1
 
 	//var buff bytes.Buffer
 	//fileSize, err := buff.ReadFrom(file)
@@ -107,33 +108,6 @@ func UploadFileToS3(file []byte, fileName string) string {
 	PutTagsOnS3Object(key, u1, fileName)
 
 	return u1
-}
-
-//GetFileFromS3 gets the file from s3 using GetObject
-func GetFileFromS3(fileDir string) {
-	key := fileDir
-
-	result, err := s3.New(awsSession).GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(key),
-	})
-
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	out, err := os.Create(fileDir)
-
-	defer func() {
-		cerr := out.Close()
-		if err == nil {
-			err = cerr
-		}
-	}()
-
-	io.Copy(out, result.Body)
-	result.Body.Close()
 }
 
 func ReceiveFileFromClient(w http.ResponseWriter, r *http.Request) {
@@ -171,11 +145,16 @@ func ReceiveFileFromClient(w http.ResponseWriter, r *http.Request) {
 	w.Write(jData)
 }
 
-func downloadFile(w http.ResponseWriter, r *http.Request) {
-	key := r.URL.Path
-	if true {
-		key = "upload2.txt"
+func downloadFileToClient(w http.ResponseWriter, r *http.Request) {
+	keySet := strings.Split(r.URL.Path, "download/")
+
+	if len(keySet) < 1 {
+		log.Printf("Error - key not specified\n")
+		w.Write([]byte("Error - key not specified"))
+		return
 	}
+
+	key := keySet[1]
 
 	result, err := s3.New(awsSession).GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(bucketName),
@@ -290,7 +269,7 @@ func main() {
 		}
 	})
 
-	http.HandleFunc("/download/", downloadFile)
+	http.HandleFunc("/download/", downloadFileToClient)
 
 	log.Printf("Listening on port %s\n\n", port)
 	http.ListenAndServe(":"+port, nil)
