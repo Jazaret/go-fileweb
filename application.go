@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	region     = os.Getenv("AWS_REGION")
-	bucketName = os.Getenv("BUCKET_NAME")
+	region     = "us-east-1"        //os.Getenv("AWS_REGION")
+	bucketName = "jazar-testbucket" //os.Getenv("BUCKET_NAME")
 )
 
 var awsSession *session.Session
@@ -50,75 +50,63 @@ func PutTagsOnS3Object(key, uuid, fileDir string) {
 	})
 
 	if err != nil {
+		log.Printf("Error on PutObjectTagging %s\n", err)
 		log.Fatal(err)
 	}
 }
 
-// AddFileToS3 will upload a single file to S3, it will require a pre-built aws session
-// and will set file info like content type and encryption on the uploaded file.
-func AddFileToS3(s *session.Session, fileDir string) (id string, err error) {
-	key := fileDir
+func UploadFileToS3(file []byte, fileName string) string {
+	key := fileName
 	u1 := uuid.Must(uuid.NewV4()).String()
+	size := int64(len(file))
 
-	// Open the file for use
-	file, err := os.Open(fileDir)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
+	//var buff bytes.Buffer
+	//fileSize, err := buff.ReadFrom(file)
 
-	// Get file size and read the file content into a buffer
-	fileInfo, _ := file.Stat()
-	var size int64 = fileInfo.Size()
-	buffer := make([]byte, size)
-	file.Read(buffer)
-
-	// Config settings: this is where you choose the bucket, filename, content-type etc.
-	// of the file you're uploading.
-	_, err = s3.New(s).PutObject(&s3.PutObjectInput{
+	_, err := s3.New(awsSession).PutObject(&s3.PutObjectInput{
 		Bucket:               aws.String(bucketName),
 		Key:                  aws.String(key),
 		ACL:                  aws.String("private"),
-		Body:                 bytes.NewReader(buffer),
+		Body:                 bytes.NewReader(file),
 		ContentLength:        aws.Int64(size),
-		ContentType:          aws.String(http.DetectContentType(buffer)),
+		ContentType:          aws.String(http.DetectContentType(file)),
 		ContentDisposition:   aws.String("attachment"),
 		ServerSideEncryption: aws.String("AES256"),
 		Metadata: map[string]*string{
-			"file-name": aws.String(fileDir),
+			"file-name": aws.String(fileName),
 			"uuid":      aws.String(u1),
 		},
 	})
 
-	PutTagsOnS3Object(key, u1, fileDir)
+	if err != nil {
+		log.Printf("Error on PutObject %s\n", err)
+		log.Fatal(err)
+	}
 
-	return u1, err
+	PutTagsOnS3Object(key, u1, fileName)
+
+	return u1
 }
 
-func ReceiveFile(w http.ResponseWriter, r *http.Request) {
-	var Buf bytes.Buffer
+func ReceiveFile(w http.ResponseWriter, r *http.Request) string {
 	// in your case file would be fileupload
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		panic(err)
+		log.Printf("Error on FormFile %s\n", err)
+		log.Fatal(err)
 	}
 	defer file.Close()
 	name := strings.Split(header.Filename, ".")
 
 	fmt.Printf("File name %s\n", name[0])
-	// Copy the file data to my buffer
-	io.Copy(&Buf, file)
-	// do something with the contents...
-	// I normally have a struct defined and unmarshal into a struct, but this will
-	// work as an example
-	contents := Buf.String()
-	fmt.Println(contents)
-	// I reset the buffer in case I want to use it again
-	// reduces memory allocations in more intense projects
-	Buf.Reset()
-	// do something else
-	// etc write header
-	return
+	buffer, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Printf("Error on ReadAll %s\n", err)
+		log.Fatal(err)
+	}
+	result := UploadFileToS3(buffer, header.Filename)
+
+	return result
 }
 
 func init() {
@@ -148,12 +136,14 @@ func main() {
 
 	http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
-			ReceiveFile(w, r)
+			log.Printf("HTTP POST received on upload...\n")
+			id := ReceiveFile(w, r)
 			w.Header().Set("Content-Type", "application/json")
-			data := fileResponse{ID: "1123"}
+			data := fileResponse{ID: id}
 			jData, err := json.Marshal(data)
 			if err != nil {
-				panic(err)
+				log.Printf("Error on Marshal %s\n", err)
+				log.Fatal(err)
 				return
 			}
 			w.Write(jData)
