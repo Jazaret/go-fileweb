@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -18,7 +17,20 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-var index = `<html>
+var awsSession *session.Session
+
+type fileResponse struct {
+	ID string `json: ID`
+}
+
+//File is the main data struct of our file system
+type File struct {
+	ID   string `json:"ID"`
+	Name string `json:"Name"`
+	Size int64  `json:"Size"`
+}
+
+const index = `<html>
 <head>
    	<title>Upload file</title>
 </head>
@@ -36,14 +48,8 @@ var (
 	bucketName = "jazar-testbucket" //os.Getenv("BUCKET_NAME")
 )
 
-var awsSession *session.Session
-
-type fileResponse struct {
-	ID string `json: ID`
-}
-
 //PutTagsOnS3Object - adds set tags to file
-func PutTagsOnS3Object(key, uuid, fileDir string) {
+func PutTagsOnS3Object(key, uuid, fileName string) {
 
 	tags := []*s3.Tag{
 		&s3.Tag{
@@ -52,7 +58,7 @@ func PutTagsOnS3Object(key, uuid, fileDir string) {
 		},
 		&s3.Tag{
 			Key:   aws.String("file-name"),
-			Value: aws.String("doiwork"),
+			Value: aws.String(fileName),
 		},
 	}
 
@@ -130,25 +136,39 @@ func GetFileFromS3(fileDir string) {
 	result.Body.Close()
 }
 
-func ReceiveFile(w http.ResponseWriter, r *http.Request) string {
-	// in your case file would be fileupload
+func ReceiveFileFromClient(w http.ResponseWriter, r *http.Request) {
+
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		log.Printf("Error on FormFile %s\n", err)
-		log.Fatal(err)
+		w.Write([]byte(err.Error()))
+		return
 	}
 	defer file.Close()
-	name := strings.Split(header.Filename, ".")
 
-	fmt.Printf("File name %s\n", name[0])
+	if header.Filename == "" {
+		log.Printf("File does not exist %s\n", err)
+		w.Write([]byte("File does not exist"))
+		return
+	}
+
 	buffer, err := ioutil.ReadAll(file)
 	if err != nil {
 		log.Printf("Error on ReadAll %s\n", err)
-		log.Fatal(err)
+		w.Write([]byte(err.Error()))
+		return
 	}
 	result := UploadFileToS3(buffer, header.Filename)
 
-	return result
+	w.Header().Set("Content-Type", "application/json")
+	data := fileResponse{ID: result}
+	jData, err := json.Marshal(data)
+	if err != nil {
+		log.Printf("Error on Marshal %s\n", err)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.Write(jData)
 }
 
 func downloadFile(w http.ResponseWriter, r *http.Request) {
@@ -164,13 +184,13 @@ func downloadFile(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("Error on GetObject %s\n", err)
-		log.Fatal(err)
+		w.Write([]byte(err.Error()))
+		return
 	}
 
 	fileName := *result.Metadata["File-Name"]
 	//uuid := *result.Metadata["Uuid"]
 
-	//Get c
 	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
 	w.Header().Set("Content-Type", *result.ContentType)
 	w.Header().Set("Content-Length", strconv.FormatInt(*result.ContentLength, 10))
@@ -178,6 +198,58 @@ func downloadFile(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, result.Body)
 
 	defer result.Body.Close()
+}
+
+func listFiles(w http.ResponseWriter, r *http.Request) {
+	var fileList []File
+	params := &s3.ListObjectsInput{
+		Bucket: aws.String(bucketName),
+	}
+
+	resp, err := s3.New(awsSession).ListObjects(params)
+	if err != nil {
+		log.Printf("Failed to GetList: %s\n", err.Error())
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	for _, key := range resp.Contents {
+		file := File{}
+		file.ID = *key.Key
+		file.Size = *key.Size
+		file.Name = GetFileNameFromS3(*key.Key)
+		fileList = append(fileList, file)
+		fmt.Println(*key.Key)
+	}
+
+	jData, err := json.Marshal(fileList)
+	if err != nil {
+		log.Printf("Error on Marshal %s\n", err)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.Write(jData)
+}
+
+//GetFileNameFromS3 returns the name of the file from the tag value
+func GetFileNameFromS3(key string) string {
+	const FileNameTag = "file-name"
+	result := ""
+	params := &s3.GetObjectTaggingInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	}
+
+	tags, _ := s3.New(awsSession).GetObjectTagging(params)
+
+	for _, v := range tags.TagSet {
+		if *v.Key == FileNameTag {
+			result = *v.Value
+			return result
+		}
+	}
+
+	return result
 }
 
 func init() {
@@ -200,24 +272,18 @@ func main() {
 	log.SetOutput(f)
 
 	const indexPage = "public/index.html"
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Serving %s to %s...\n", indexPage, r.RemoteAddr)
 		w.Write([]byte(index))
 	})
 
+	http.HandleFunc("/list", listFiles)
+
 	http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			log.Printf("HTTP POST received on upload...\n")
-			id := ReceiveFile(w, r)
-			w.Header().Set("Content-Type", "application/json")
-			data := fileResponse{ID: id}
-			jData, err := json.Marshal(data)
-			if err != nil {
-				log.Printf("Error on Marshal %s\n", err)
-				log.Fatal(err)
-				return
-			}
-			w.Write(jData)
+			ReceiveFileFromClient(w, r)
 		} else {
 			log.Printf("Serving %s to %s...\n", indexPage, r.RemoteAddr)
 			w.Write([]byte(index))
