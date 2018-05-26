@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/jazaret/go-fileweb/controller"
+	"github.com/Jazaret/go-fileweb/controller"
 )
 
 func main() {

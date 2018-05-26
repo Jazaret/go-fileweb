@@ -11,10 +11,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Jazaret/go-fileweb/model"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/jazaret/go-fileweb/model"
 	uuid "github.com/satori/go.uuid"
 )
 
