@@ -1,244 +1,14 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
-	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	uuid "github.com/satori/go.uuid"
+	"github.com/jazaret/go-fileweb/controller"
 )
-
-var awsSession *session.Session
-
-type fileResponse struct {
-	ID string `json: ID`
-}
-
-//File is the main data struct of our file system
-type File struct {
-	ID   string `json:"ID"`
-	Name string `json:"Name"`
-	Size int64  `json:"Size"`
-}
-
-const index = `<html>
-<head>
-   	<title>Upload file</title>
-</head>
-<body>
-<form enctype="multipart/form-data" action="/upload" method="post">
-	<input type="file" name="file" />
-	<input type="hidden" name="token" value="{{.}}"/>
-	<input type="submit" value="upload" />
-</form>
-</body>
-</html>`
-
-var (
-	region     = "us-east-1"        //os.Getenv("AWS_REGION")
-	bucketName = "jazar-testbucket" //os.Getenv("BUCKET_NAME")
-)
-
-//PutTagsOnS3Object - adds set tags to file
-func PutTagsOnS3Object(key, uuid, fileName string) {
-
-	tags := []*s3.Tag{
-		&s3.Tag{
-			Key:   aws.String("uuid"),
-			Value: aws.String(uuid),
-		},
-		&s3.Tag{
-			Key:   aws.String("file-name"),
-			Value: aws.String(fileName),
-		},
-	}
-
-	_, err := s3.New(awsSession).PutObjectTagging(&s3.PutObjectTaggingInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(key),
-		Tagging: &s3.Tagging{
-			TagSet: tags,
-		},
-	})
-
-	if err != nil {
-		log.Printf("Error on PutObjectTagging %s\n", err)
-		log.Fatal(err)
-	}
-}
-
-func UploadFileToS3(file []byte, fileName string) string {
-	u1 := uuid.Must(uuid.NewV4()).String()
-	size := int64(len(file))
-	key := u1
-
-	//var buff bytes.Buffer
-	//fileSize, err := buff.ReadFrom(file)
-
-	_, err := s3.New(awsSession).PutObject(&s3.PutObjectInput{
-		Bucket:               aws.String(bucketName),
-		Key:                  aws.String(key),
-		ACL:                  aws.String("private"),
-		Body:                 bytes.NewReader(file),
-		ContentLength:        aws.Int64(size),
-		ContentType:          aws.String(http.DetectContentType(file)),
-		ContentDisposition:   aws.String("attachment"),
-		ServerSideEncryption: aws.String("AES256"),
-		Metadata: map[string]*string{
-			"file-name": aws.String(fileName),
-			"uuid":      aws.String(u1),
-		},
-	})
-
-	if err != nil {
-		log.Printf("Error on PutObject %s\n", err)
-		log.Fatal(err)
-	}
-
-	PutTagsOnS3Object(key, u1, fileName)
-
-	return u1
-}
-
-func ReceiveFileFromClient(w http.ResponseWriter, r *http.Request) {
-
-	file, header, err := r.FormFile("file")
-	if err != nil {
-		log.Printf("Error on FormFile %s\n", err)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	defer file.Close()
-
-	if header.Filename == "" {
-		log.Printf("File does not exist %s\n", err)
-		w.Write([]byte("File does not exist"))
-		return
-	}
-
-	buffer, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Printf("Error on ReadAll %s\n", err)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	result := UploadFileToS3(buffer, header.Filename)
-
-	w.Header().Set("Content-Type", "application/json")
-	data := fileResponse{ID: result}
-	jData, err := json.Marshal(data)
-	if err != nil {
-		log.Printf("Error on Marshal %s\n", err)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	w.Write(jData)
-}
-
-func downloadFileToClient(w http.ResponseWriter, r *http.Request) {
-	keySet := strings.Split(r.URL.Path, "download/")
-
-	if len(keySet) < 1 {
-		log.Printf("Error - key not specified\n")
-		w.Write([]byte("Error - key not specified"))
-		return
-	}
-
-	key := keySet[1]
-
-	result, err := s3.New(awsSession).GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(key),
-	})
-
-	if err != nil {
-		log.Printf("Error on GetObject %s\n", err)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	fileName := *result.Metadata["File-Name"]
-	//uuid := *result.Metadata["Uuid"]
-
-	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
-	w.Header().Set("Content-Type", *result.ContentType)
-	w.Header().Set("Content-Length", strconv.FormatInt(*result.ContentLength, 10))
-
-	io.Copy(w, result.Body)
-
-	defer result.Body.Close()
-}
-
-func listFiles(w http.ResponseWriter, r *http.Request) {
-	var fileList []File
-	params := &s3.ListObjectsInput{
-		Bucket: aws.String(bucketName),
-	}
-
-	resp, err := s3.New(awsSession).ListObjects(params)
-	if err != nil {
-		log.Printf("Failed to GetList: %s\n", err.Error())
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	for _, key := range resp.Contents {
-		file := File{}
-		file.ID = *key.Key
-		file.Size = *key.Size
-		file.Name = GetFileNameFromS3(*key.Key)
-		fileList = append(fileList, file)
-		fmt.Println(*key.Key)
-	}
-
-	jData, err := json.Marshal(fileList)
-	if err != nil {
-		log.Printf("Error on Marshal %s\n", err)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	w.Write(jData)
-}
-
-//GetFileNameFromS3 returns the name of the file from the tag value
-func GetFileNameFromS3(key string) string {
-	const FileNameTag = "file-name"
-	result := ""
-	params := &s3.GetObjectTaggingInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(key),
-	}
-
-	tags, _ := s3.New(awsSession).GetObjectTagging(params)
-
-	for _, v := range tags.TagSet {
-		if *v.Key == FileNameTag {
-			result = *v.Value
-			return result
-		}
-	}
-
-	return result
-}
-
-func init() {
-	log.Println("Calling init")
-	var err error
-	awsSession, err = session.NewSession(&aws.Config{Region: aws.String(region)})
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 func main() {
 	port := os.Getenv("PORT")
@@ -250,27 +20,46 @@ func main() {
 	defer f.Close()
 	log.SetOutput(f)
 
-	const indexPage = "public/index.html"
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Serving %s to %s...\n", indexPage, r.RemoteAddr)
-		w.Write([]byte(index))
-	})
-
-	http.HandleFunc("/list", listFiles)
-
-	http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
-			log.Printf("HTTP POST received on upload...\n")
-			ReceiveFileFromClient(w, r)
-		} else {
-			log.Printf("Serving %s to %s...\n", indexPage, r.RemoteAddr)
-			w.Write([]byte(index))
-		}
-	})
-
-	http.HandleFunc("/download/", downloadFileToClient)
+	templates := populateTemplates()
+	controller.Startup(templates)
 
 	log.Printf("Listening on port %s\n\n", port)
 	http.ListenAndServe(":"+port, nil)
+}
+
+//Create template for our website
+func populateTemplates() map[string]*template.Template {
+	result := make(map[string]*template.Template)
+	const basePath = "templates"
+	layout := template.Must(template.ParseFiles(basePath + "/_layout.html"))
+
+	//Content Templates
+	dir, err := os.Open(basePath + "/content")
+	if err != nil {
+		panic("Failed to read contents of blocks directiory: " + err.Error())
+	}
+	fis, err := dir.Readdir(-1)
+	if err != nil {
+		panic("Failed to read contents of content directiory: " + err.Error())
+	}
+	for _, fi := range fis {
+		f, err := os.Open(basePath + "/content/" + fi.Name())
+		if err != nil {
+			panic("Failed to open template '" + fi.Name() + "'")
+		}
+		content, err := ioutil.ReadAll(f)
+		if err != nil {
+			panic("Failed to read content from file '" + fi.Name() + "'")
+		}
+		f.Close()
+
+		tmpl := template.Must(layout.Clone())
+		_, err = tmpl.Parse(string(content))
+		if err != nil {
+			panic("Failed to parse contents of '" + fi.Name() + "' as template. Error - " + err.Error())
+		}
+		result[fi.Name()] = tmpl
+	}
+
+	return result
 }

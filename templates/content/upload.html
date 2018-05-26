@@ -1,0 +1,9 @@
+{{define "content"}}
+<h1>Hello there. Upload a file to continue</h1>
+<form enctype="multipart/form-data" action="/upload" method="post">
+	<input type="file" name="file" />
+	<input type="hidden" name="token" value="{{.}}"/>
+	<input type="submit" value="upload" />
+</form><br/>
+<a href="list">List Files</a><br/>
+{{end}}

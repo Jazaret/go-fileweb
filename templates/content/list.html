@@ -1,0 +1,16 @@
+{{define "content"}}
+    <h1>File List:</h1>
+    <ul>        
+        {{range .Files}}
+        <li>
+            <p>
+            ID: {{.ID}}<br/>
+            Name: {{.Name}}<br/>
+            Size: {{.Size}} bytes<br/>
+            <a href="download/{{.ID}}">Click here to download</a>
+            </p>
+        </li>
+        {{end}}        
+    </ul>
+    <a href="upload">Upload File</a><br/>
+{{end}}
