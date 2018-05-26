@@ -8,7 +8,7 @@ type File struct {
 }
 
 type FileResponse struct {
-	ID string `json: ID`
+	ID string `json:"ID"`
 }
 
 type FileList struct {
