@@ -1,4 +1,4 @@
-# go-fileweb
+# go-fileweb [![Build Status](https://travis-ci.org/Jazaret/go-fileweb.svg?branch=master)](https://travis-ci.org/Jazaret/go-fileweb)
 
 Web service that stores and retrieves files. Written in Go and uploaded to Amazon's ElasticBeanstalk. 
 
