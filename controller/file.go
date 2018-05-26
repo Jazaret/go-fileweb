@@ -76,7 +76,6 @@ func (f file) receiveFileFromClient(w http.ResponseWriter, r *http.Request) {
 		}
 		result := uploadFileToS3(buffer, header.Filename)
 
-		w.Header().Set("Content-Type", "application/json")
 		data := model.FileResponse{ID: result}
 		w.Header().Add("Content-Type", "text/html")
 		f.uploadComplete.Execute(w, data)
@@ -170,6 +169,39 @@ func getFiles(w http.ResponseWriter, r *http.Request) ([]model.File, error) {
 	return fileList, nil
 }
 
+func downloadFileToClient(w http.ResponseWriter, r *http.Request) {
+	keySet := strings.Split(r.URL.Path, "download/")
+
+	if len(keySet) < 1 {
+		log.Printf("Error - key not specified\n")
+		w.Write([]byte("Error - key not specified"))
+		return
+	}
+
+	key := keySet[1]
+
+	result, err := s3.New(awsSession).GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	})
+
+	if err != nil {
+		log.Printf("Error on GetObject %s\n", err)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	fileName := *result.Metadata["File-Name"]
+
+	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
+	w.Header().Set("Content-Type", *result.ContentType)
+	w.Header().Set("Content-Length", strconv.FormatInt(*result.ContentLength, 10))
+
+	io.Copy(w, result.Body)
+
+	defer result.Body.Close()
+}
+
 //putTagsOnS3Object - adds set tags to file
 func putTagsOnS3Object(key, uuid, fileName string) {
 
@@ -203,9 +235,6 @@ func uploadFileToS3(file []byte, fileName string) string {
 	size := int64(len(file))
 	key := u1
 
-	//var buff bytes.Buffer
-	//fileSize, err := buff.ReadFrom(file)
-
 	_, err := s3.New(awsSession).PutObject(&s3.PutObjectInput{
 		Bucket:               aws.String(bucketName),
 		Key:                  aws.String(key),
@@ -229,40 +258,6 @@ func uploadFileToS3(file []byte, fileName string) string {
 	putTagsOnS3Object(key, u1, fileName)
 
 	return u1
-}
-
-func downloadFileToClient(w http.ResponseWriter, r *http.Request) {
-	keySet := strings.Split(r.URL.Path, "download/")
-
-	if len(keySet) < 1 {
-		log.Printf("Error - key not specified\n")
-		w.Write([]byte("Error - key not specified"))
-		return
-	}
-
-	key := keySet[1]
-
-	result, err := s3.New(awsSession).GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(key),
-	})
-
-	if err != nil {
-		log.Printf("Error on GetObject %s\n", err)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	fileName := *result.Metadata["File-Name"]
-	//uuid := *result.Metadata["Uuid"]
-
-	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
-	w.Header().Set("Content-Type", *result.ContentType)
-	w.Header().Set("Content-Length", strconv.FormatInt(*result.ContentLength, 10))
-
-	io.Copy(w, result.Body)
-
-	defer result.Body.Close()
 }
 
 //GetFileNameFromS3 returns the name of the file from the tag value
