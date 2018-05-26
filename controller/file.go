@@ -18,10 +18,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-type fileResponse struct {
-	ID string `json: ID`
-}
-
 type file struct {
 	uploadTemplate *template.Template
 	listTemplate   *template.Template
@@ -81,7 +77,7 @@ func (f file) receiveFileFromClient(w http.ResponseWriter, r *http.Request) {
 		result := uploadFileToS3(buffer, header.Filename)
 
 		w.Header().Set("Content-Type", "application/json")
-		data := fileResponse{ID: result}
+		data := model.FileResponse{ID: result}
 		w.Header().Add("Content-Type", "text/html")
 		f.uploadComplete.Execute(w, data)
 	} else {

@@ -7,6 +7,10 @@ type File struct {
 	Size int64  `json:"Size"`
 }
 
+type FileResponse struct {
+	ID string `json: ID`
+}
+
 type FileList struct {
 	Files []File
 }
