@@ -1,7 +1,9 @@
 package model
 
 import (
+	"errors"
 	"io"
+	"regexp"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -41,5 +43,13 @@ func UploadFileToRepo(file []byte, fileName string) (string, error) {
 
 //GetFileFromRepo - Retrieves file from repository
 func GetFileFromRepo(key string) (File, error) {
+	if len(key) == 0 || !isValidUUID(key) {
+		return File{}, errors.New("Empty or invalid key")
+	}
 	return fileRepo.GetObject(key)
+}
+
+func isValidUUID(uuid string) bool {
+	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$")
+	return r.MatchString(uuid)
 }
