@@ -8,6 +8,12 @@ import (
 	"os"
 
 	"github.com/Jazaret/go-fileweb/controller"
+	"github.com/Jazaret/go-fileweb/model"
+)
+
+var (
+	region     = "us-east-1"        //os.Getenv("AWS_REGION")
+	bucketName = "jazar-testbucket" //os.Getenv("BUCKET_NAME")
 )
 
 func main() {
@@ -19,6 +25,8 @@ func main() {
 	f, _ := os.Create("/var/log/golang/golang-server.log")
 	defer f.Close()
 	log.SetOutput(f)
+
+	model.InitRepository(region, bucketName)
 
 	templates := populateTemplates()
 	controller.Startup(templates)

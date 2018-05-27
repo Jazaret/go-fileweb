@@ -14,7 +14,6 @@ var (
 
 //Startup - This is the startup method
 func Startup(templates map[string]*template.Template) {
-	fileController.init()
 
 	fileController.uploadTemplate = templates["upload.html"]
 	fileController.listTemplate = templates["list.html"]
