@@ -34,6 +34,10 @@ func GetFiles() ([]File, error) {
 
 //UploadFileToRepo - Uploads file to repository
 func UploadFileToRepo(file []byte, fileName string) (string, error) {
+	if len(fileName) == 0 {
+		return "", errors.New("File name is required")
+	}
+
 	u1 := uuid.Must(uuid.NewV4()).String()
 	key := u1
 
