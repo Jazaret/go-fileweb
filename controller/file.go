@@ -66,8 +66,12 @@ func (f file) receiveFileFromClient(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "text/html")
 		f.uploadComplete.Execute(w, data)
 	} else {
-		w.Header().Add("Content-Type", "text/html")
-		f.uploadTemplate.Execute(w, nil)
+		if strings.Contains(r.URL.Path, "/api/") {
+			w.Write([]byte("API - Please send POST of FormFile with attribute name of 'file' or use website url"))
+		} else {
+			w.Header().Add("Content-Type", "text/html")
+			f.uploadTemplate.Execute(w, nil)
+		}
 	}
 }
 

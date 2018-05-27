@@ -1,3 +1,30 @@
 {{define "content"}}
-APOHSFPASIOHFPIASHPISAHPFHSPFH!!!! WOOO
+<div>
+    <p>Web service that stores and retrieves files. Written in Go and uploaded to Amazon's ElasticBeanstalk.</p>
+
+    <h1>Website links</h1>
+    <ul>
+            <li><a href="/">Home</a> - This page</li>
+            <li><a href="upload">Upload a file</a> - Form to upload a file. Returns the ID of the file after successful upload</li>
+            <li><a href="list">List files</a> - Can download files here</li>
+    </ul>
+
+    <h1>API Endpoint Routes:</h1>
+    <ul>
+        <li>/api/upload - POST form data with file object to add a file to the repository - Returns the ID of the file for retrieval. Response as JSON</li>
+        <li>/api/download/{ID} - Endpoint that downloads the file to the client - keeps the original file name on download.</li>
+        <li>/api/list - Endpoint that returns a list of all files in the system, their identifier, original filename, and the byte size of the file.. Response as JSON</li>
+    </ul>
+    <h2>Application URL</h2>
+    <a href="http://gofilewebapp-env.hte7s2zj5y.us-east-1.elasticbeanstalk.com">http://gofilewebapp-env.hte7s2zj5y.us-east-1.elasticbeanstalk.com</a>
+
+    <h1>Considerations:</h1>
+    <ul>
+        <li>Files are stored in an S3 bucket with the original file name, content type, and size stored in the object's metadata. </li>
+        <li>Website uses a model / view / controller structure with HTML templates</li>
+        <li>The list method is poorly optimized by making a query to S3 on each file. To resolve this I would add a parallel data repository/database in order to make a single call to the resource for faster performance.</li>
+        <li>There is no consideration as to uploading a duplicate file. We can check the file name as well as a checksum or hash stored on a seperate queriable repository to ensure that users are not uploading the same file repeatedly. </li>
+        <li>Downloads and Uploads for very large files is not taken under considerations. </li>
+    </ul>
+</div>
 {{end}}
