@@ -1,10 +1,52 @@
 <!DOCTYPE html>
 <html>
-<head>
-<title>Repository</title>
-<link href="/css/app.css" rel="stylesheet" />
-</head>
+    <head>
+        <title>File Repository</title>
+        <meta name="description" content="website description" />
+        <meta name="keywords" content="website keywords, website keywords" />
+        <meta http-equiv="content-type" content="text/html; charset=windows-1252" />
+        <link rel="stylesheet" type="text/css" href="css/style.css" />
+      </head>
 <body>
-    {{template "content" .}}
+    
+    <div id="main">
+        <div id="header">
+          <div id="logo">
+            <div id="logo_text">
+              <h1><a href="">File Repository</a></h1>
+              <h2>Storing assets is what we do.</h2>
+            </div>
+          </div>
+          <div id="menubar">
+            <ul id="menu">
+              <!-- put class="selected" in the li tag for the selected page - to highlight which page you're on -->
+              <li><a href="/">Home</a></li>
+              <li><a href="list">File List</a></li>
+              <li><a href="upload">Upload File</a></li>
+            </ul>
+          </div>
+        </div>
+        <div id="site_content">
+          <div class="sidebar">
+            <h1>Thank you</h1>
+            <h4>New Website Launched</h4>
+            <h5>May 28st, 2018</h5>
+            <p>Thank you for visiting this site. Please visit the links below</p>
+            <h1>Useful Links</h1>
+            <ul>
+              <li><a href="/">Home</a></li>
+              <li><a href="upload">Upload a file</a></li>
+              <li><a href="list">list files</a></li>
+              <li><a href="http://www.github.com/jazaret/go-web">github page</a></li>
+            </ul>
+          </div>
+          <div id="content">
+            {{template "content" .}}
+          </div>
+        </div>
+        <div id="footer">
+          <p><a href="/">Home</a> | <a href="upload">Upload File</a> | <a href="list">List Files</a> | <a href="mailto:jazaret@gmail.com">Contact Me</a></p>
+        </div>
+      </div>
 </body>
 </html>
