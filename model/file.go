@@ -13,8 +13,8 @@ type File struct {
 	ID          string        `json:"ID"`
 	Name        string        `json:"Name"`
 	Size        int64         `json:"Size"`
-	Blob        io.ReadCloser `json:"Blob"`
-	ContentType string        `json:"ContentType`
+	Blob        io.ReadCloser `json:"-"`
+	ContentType string        `json:"-"`
 }
 
 //FileResponse - server repsonse to an uploaded file - returns file id
