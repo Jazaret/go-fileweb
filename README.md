@@ -14,9 +14,9 @@ How to Compile/Run:
 * go build
 * run go-build.exe
 
-Endpoint Routes:
+API Endpoint Routes:
 
-* /upload - POST form data with file object to add a file to the repository - Returns the ID of the file for retrieval. Response as JSON
+* /api/upload - POST form data with file object to add a file to the repository - Returns the ID of the file for retrieval. Response as JSON
 * /api/download/{ID} - Endpoint that downloads the file to the client - keeps the original file name on download.
 * /api/list - Endpoint that returns a list of all files in the system, their identifier, original filename, and the byte size of the file.. Response as JSON
 
