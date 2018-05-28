@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -22,67 +23,52 @@ type file struct {
 func (f file) registerRoutes() {
 	http.HandleFunc("/api/list", f.listFilesAPI)
 	http.HandleFunc("/api/download/", f.downloadFileToClient)
-	http.HandleFunc("/api/upload", f.receiveFileFromClient)
+	http.HandleFunc("/api/upload", f.receiveFileFromClientAPI)
 
-	http.HandleFunc("/upload", f.receiveFileFromClient)
+	http.HandleFunc("/upload", f.receiveFileFromClientWeb)
 	http.HandleFunc("/download/", f.downloadFileToClient)
 	http.HandleFunc("/list", f.listFiles)
 }
 
-func (f file) receiveFileFromClient(w http.ResponseWriter, r *http.Request) {
+func (f file) receiveFileFromClientAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		log.Printf("HTTP POST received on upload...\n")
+
+		data, reciveErr := recieveFile(w, r)
+		if reciveErr != nil {
+			log.Printf("Error on recieve file %s\n", reciveErr)
+			w.Write([]byte(reciveErr.Error()))
+		}
+
+		jData, marshalErr := json.Marshal(data)
+		if marshalErr != nil {
+			log.Printf("Error on Marshal %s\n", marshalErr)
+			w.Write([]byte(marshalErr.Error()))
+			return
+		}
+		w.Header().Add("Content-Type", "application/json")
+		w.Write(jData)
+	} else {
+		w.Write([]byte("API - Please send POST of FormFile with attribute name of 'file' or use website url"))
+	}
+}
+
+func (f file) receiveFileFromClientWeb(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "POST" {
 		log.Printf("HTTP POST received on upload...\n")
 
-		file, header, err := r.FormFile("file")
-		if err != nil {
-			log.Printf("Error on FormFile %s\n", err)
-			w.Write([]byte(err.Error()))
-			return
-		}
-		defer file.Close()
-
-		if header.Filename == "" {
-			log.Printf("File does not exist %s\n", err)
-			w.Write([]byte("File does not exist"))
-			return
+		data, reciveErr := recieveFile(w, r)
+		if reciveErr != nil {
+			log.Printf("Error on recieve file %s\n", reciveErr)
+			w.Write([]byte(reciveErr.Error()))
 		}
 
-		buffer, err := ioutil.ReadAll(file)
-		if err != nil {
-			log.Printf("Error on ReadAll %s\n", err)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		result, err2 := model.UploadFileToRepo(buffer, header.Filename)
-		if err2 != nil {
-			log.Printf("Error on Upload %s\n", err)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		data := model.FileResponse{ID: result}
-		if strings.Contains(strings.ToLower(r.URL.Path), "/api/") {
-			jData, err3 := json.Marshal(data)
-			if err3 != nil {
-				log.Printf("Error on Marshal %s\n", err)
-				w.Write([]byte(err.Error()))
-				return
-			}
-			w.Header().Add("Content-Type", "application/json")
-			w.Write(jData)
-		} else {
-			w.Header().Add("Content-Type", "text/html")
-			f.uploadComplete.Execute(w, data)
-		}
+		w.Header().Add("Content-Type", "text/html")
+		f.uploadComplete.Execute(w, data)
 	} else {
-		if strings.Contains(r.URL.Path, "/api/") {
-			w.Write([]byte("API - Please send POST of FormFile with attribute name of 'file' or use website url"))
-		} else {
-			w.Header().Add("Content-Type", "text/html")
-			f.uploadTemplate.Execute(w, nil)
-		}
+		w.Header().Add("Content-Type", "text/html")
+		f.uploadTemplate.Execute(w, nil)
 	}
 }
 
@@ -146,4 +132,30 @@ func (f file) downloadFileToClient(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, result.Blob)
 
 	defer result.Blob.Close()
+}
+
+func recieveFile(w http.ResponseWriter, r *http.Request) (model.FileResponse, error) {
+	result := model.FileResponse{}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		return result, err
+	}
+	defer file.Close()
+
+	if header.Filename == "" {
+		return result, errors.New("File does not exist")
+	}
+
+	buffer, readErr := ioutil.ReadAll(file)
+	if readErr != nil {
+		return result, readErr
+	}
+
+	uploadResult, uploadErr := model.UploadFileToRepo(buffer, header.Filename)
+	if uploadErr != nil {
+		return result, uploadErr
+	}
+	result.ID = uploadResult
+
+	return result, nil
 }
