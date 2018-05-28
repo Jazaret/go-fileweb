@@ -70,9 +70,10 @@ func (f file) receiveFileFromClient(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte(err.Error()))
 				return
 			}
+			w.Header().Add("Content-Type", "application/json")
 			w.Write(jData)
 		} else {
-			w.Header().Add("Content-Type", "application/json")
+			w.Header().Add("Content-Type", "text/html")
 			f.uploadComplete.Execute(w, data)
 		}
 	} else {
