@@ -40,7 +40,7 @@ func TestUploadFileWithNoNameShouldFail(t *testing.T) {
 	fileRepo = testRepo
 	var file []byte
 
-	_, err := UploadFileToRepo(file, "")
+	_, _, err := UploadFileToRepo(file, "")
 
 	if err == nil || err.Error() != "File name is required" {
 		t.Errorf("Invalid file should not be allowed")
@@ -52,7 +52,7 @@ func TestUploadFileWithNoNameShouldPass(t *testing.T) {
 	fileRepo = testRepo
 	var file []byte
 
-	_, err := UploadFileToRepo(file, "test")
+	_, _, err := UploadFileToRepo(file, "test")
 
 	if err != nil {
 		t.Errorf("Valid file name should pass")

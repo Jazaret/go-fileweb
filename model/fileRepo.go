@@ -2,12 +2,15 @@ package model
 
 import (
 	"bytes"
+	"errors"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	uuid "github.com/satori/go.uuid"
 )
 
 var fileRepo FileRepository
@@ -15,7 +18,7 @@ var fileRepo FileRepository
 //FileRepository - interface to handle file repo methods
 type FileRepository interface {
 	GetObject(key string) (File, error)
-	PutObject(key string, file []byte, fileName string) error
+	PutObject(key string, file []byte, fileName string) (string, error)
 	ListObjects() ([]File, error)
 }
 
@@ -35,6 +38,14 @@ func (s s3Repository) GetObject(key string) (File, error) {
 		return *file, err
 	}
 
+	accessTokenExpiryDate, timeErr := time.Parse(time.RFC3339, *result.Metadata["Access-Token-Expry-Date"])
+	if timeErr != nil {
+		return *file, timeErr
+	}
+	if time.Now().UTC().After(accessTokenExpiryDate) {
+		return *file, errors.New("Access time expired")
+	}
+
 	file.Name = *result.Metadata["File-Name"]
 	file.ContentType = *result.ContentType
 	file.Size = *result.ContentLength
@@ -43,8 +54,10 @@ func (s s3Repository) GetObject(key string) (File, error) {
 	return *file, nil
 }
 
-func (s s3Repository) PutObject(key string, file []byte, fileName string) error {
+func (s s3Repository) PutObject(key string, file []byte, fileName string) (string, error) {
 	size := int64(len(file))
+	accessToken := uuid.Must(uuid.NewV4()).String()
+	accessTokenExpiryDate := time.Now().UTC().AddDate(0, 0, 7)
 	_, err := s.s3repo.PutObject(&s3.PutObjectInput{
 		Bucket:               aws.String(s.bucketName),
 		Key:                  aws.String(key),
@@ -55,14 +68,22 @@ func (s s3Repository) PutObject(key string, file []byte, fileName string) error 
 		ContentDisposition:   aws.String("attachment"),
 		ServerSideEncryption: aws.String("AES256"),
 		Metadata: map[string]*string{
-			"file-name": aws.String(fileName),
-			"uuid":      aws.String(key),
+			"file-name":               aws.String(fileName),
+			"access-token":            aws.String(accessToken),
+			"access-token-expry-date": aws.String(accessTokenExpiryDate.Format(time.RFC3339)),
 		},
 	})
 
-	s.putTagsOnS3Object(key, key, fileName)
+	if err != nil {
+		return "", err
+	}
 
-	return err
+	accessToken, err2 := s.putTagsOnS3Object(key, fileName, accessToken, accessTokenExpiryDate)
+	if err2 != nil {
+		return "", err
+	}
+
+	return accessToken, nil
 }
 
 func (s s3Repository) ListObjects() ([]File, error) {
@@ -96,17 +117,21 @@ func InitRepository(region string, bucketName string) {
 	fileRepo = &s3Repository{s3.New(awsSession), bucketName}
 }
 
-//putTagsOnS3Object - adds set tags to file
-func (s s3Repository) putTagsOnS3Object(key, uuid, fileName string) {
+//putTagsOnS3Object - adds set tags to file. Adds
+func (s s3Repository) putTagsOnS3Object(key, fileName, accessToken string, accessTokenExpiryDate time.Time) (string, error) {
 
 	tags := []*s3.Tag{
 		&s3.Tag{
-			Key:   aws.String("uuid"),
-			Value: aws.String(uuid),
-		},
-		&s3.Tag{
 			Key:   aws.String("file-name"),
 			Value: aws.String(fileName),
+		},
+		&s3.Tag{
+			Key:   aws.String("access-token"),
+			Value: aws.String(accessToken),
+		},
+		&s3.Tag{
+			Key:   aws.String("access-token-expry-date"),
+			Value: aws.String(accessTokenExpiryDate.Format(time.RFC3339)),
 		},
 	}
 
@@ -121,7 +146,10 @@ func (s s3Repository) putTagsOnS3Object(key, uuid, fileName string) {
 	if err != nil {
 		log.Printf("Error on PutObjectTagging %s\n", err)
 		log.Fatal(err)
+		return "", err
 	}
+
+	return accessToken, nil
 }
 
 //GetFileNameFromS3 returns the name of the file from the tag value

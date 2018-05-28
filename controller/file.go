@@ -55,7 +55,7 @@ func (f file) receiveFileFromClient(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		result, err2 := model.UploadFileToRepo(buffer, header.Filename)
+		result, _, err2 := model.UploadFileToRepo(buffer, header.Filename)
 		if err2 != nil {
 			log.Printf("Error on Upload %s\n", err)
 			w.Write([]byte(err.Error()))

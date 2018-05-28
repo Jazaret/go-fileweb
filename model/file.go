@@ -13,13 +13,16 @@ type File struct {
 	ID          string        `json:"ID"`
 	Name        string        `json:"Name"`
 	Size        int64         `json:"Size"`
-	Blob        io.ReadCloser `json:"Blob"`
-	ContentType string        `json:"ContentType`
+	Blob        io.ReadCloser `json:"-"`
+	ContentType string        `json:"-"`
+	AccessToken string        `json:"-"` //Future use
+	UploadedBy  string        `json:"-"` //Future use
 }
 
 //FileResponse - server repsonse to an uploaded file - returns file id
 type FileResponse struct {
-	ID string `json:"ID"`
+	ID          string `json:"ID"`
+	AccessToken string `json:"-"` //Future use
 }
 
 //FileList - list of files
@@ -33,16 +36,16 @@ func GetFiles() ([]File, error) {
 }
 
 //UploadFileToRepo - Uploads file to repository
-func UploadFileToRepo(file []byte, fileName string) (string, error) {
+func UploadFileToRepo(file []byte, fileName string) (string, string, error) {
 	if len(fileName) == 0 {
-		return "", errors.New("File name is required")
+		return "", "", errors.New("File name is required")
 	}
 
 	u1 := uuid.Must(uuid.NewV4()).String()
 	key := u1
 
-	err := fileRepo.PutObject(key, file, fileName)
-	return key, err
+	accessToken, err := fileRepo.PutObject(key, file, fileName)
+	return accessToken, key, err
 }
 
 //GetFileFromRepo - Retrieves file from repository
