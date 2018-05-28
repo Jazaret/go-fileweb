@@ -63,7 +63,7 @@ func (f file) receiveFileFromClient(w http.ResponseWriter, r *http.Request) {
 		}
 
 		data := model.FileResponse{ID: result}
-		if strings.Contains(r.URL.Path, "/api/") {
+		if strings.Contains(strings.ToLower(r.URL.Path), "/api/") {
 			jData, err3 := json.Marshal(data)
 			if err3 != nil {
 				log.Printf("Error on Marshal %s\n", err)
