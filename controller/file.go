@@ -63,8 +63,18 @@ func (f file) receiveFileFromClient(w http.ResponseWriter, r *http.Request) {
 		}
 
 		data := model.FileResponse{ID: result}
-		w.Header().Add("Content-Type", "text/html")
-		f.uploadComplete.Execute(w, data)
+		if strings.Contains(r.URL.Path, "/api/") {
+			jData, err3 := json.Marshal(data)
+			if err3 != nil {
+				log.Printf("Error on Marshal %s\n", err)
+				w.Write([]byte(err.Error()))
+				return
+			}
+			w.Write(jData)
+		} else {
+			w.Header().Add("Content-Type", "application/json")
+			f.uploadComplete.Execute(w, data)
+		}
 	} else {
 		if strings.Contains(r.URL.Path, "/api/") {
 			w.Write([]byte("API - Please send POST of FormFile with attribute name of 'file' or use website url"))
@@ -103,6 +113,7 @@ func (f file) listFilesAPI(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
+	w.Header().Add("Content-Type", "application/json")
 	w.Write(jData)
 }
 
