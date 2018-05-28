@@ -3,7 +3,7 @@
 Web service that stores and retrieves files. Written in Go and uploaded to Amazon's ElasticBeanstalk. Implements a full browser website as well as an additional endpoint that lists the files as requested. 
 
 How to Compile/Run: 
-* git clone https://github.com/Jazaret/go-fileweb
+* git clone https://github.com/Jazaret/go-fileweb.git
 * cd go-fileweb
 * go get -t -v ./...
 * set aws region / bucket-name variables on application.go for user's environment
