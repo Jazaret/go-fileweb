@@ -6,6 +6,7 @@ How to Compile/Run:
 * git clone https://github.com/Jazaret/go-fileweb
 * cd go-fileweb
 * go get -t -v ./...
+* set aws region / bucket-name variables on application.go for user's environment
 * go build
 * run go-build.exe
 
