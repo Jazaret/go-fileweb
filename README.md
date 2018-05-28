@@ -2,6 +2,13 @@
 
 Web service that stores and retrieves files. Written in Go and uploaded to Amazon's ElasticBeanstalk. 
 
+How to Compile/Run: 
+* git clone https://github.com/Jazaret/go-fileweb
+* cd go-fileweb
+* go get -t -v ./...
+* go build
+* run go-build.exe
+
 Endpoint Routes:
 
 * /upload - POST form data with file object to add a file to the repository - Returns the ID of the file for retrieval. Response as JSON
