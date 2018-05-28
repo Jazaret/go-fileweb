@@ -13,8 +13,10 @@ Full website:
 http://gofilewebapp-env.hte7s2zj5y.us-east-1.elasticbeanstalk.com
 
 Considerations:
+* Code is stored on github with Travis CI for code build & tests validation. https://github.com/Jazaret/go-fileweb
 * Files are stored in an S3 bucket with the original file name, content type, & size stored in the object's metadata. 
 * Website uses a model / view / controller structure with HTML templates
-* The list method is poorly optimized by making a query to S3 on each file. To resolve this I would add a parallel data repository/database in order to make a single call to the resource for faster performance.
+* The list method is poorly optimized by making a query to S3 on each file to get the original file name stored in tag/metadata. To resolve this I would add a parallel data repository/database in order to make a single call to the resource for faster performance.
+* There is logic for a token with Expiration on branch https://github.com/Jazaret/go-fileweb/tree/AccessToken-With-Expiration. Implementation was incomplete due to time. Has hardcoded expiry time of 7 days. Also would have liked to implement access using both file ID and file access token ID, but that was not part of specifications. 
 * There is no consideration as to uploading a duplicate file. We can check the file name as well as a checksum or hash stored on a seperate queriable repository to ensure that users are not uploading the same file repeatedly. 
 * Downloads & Uploads for very large files is not taken under considerations. 
