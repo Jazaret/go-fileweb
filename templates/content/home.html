@@ -24,7 +24,7 @@
         <li>Files are stored in an S3 bucket with the original file name, content type, and size stored in the object's metadata. </li>
         <li>Website uses a model / view / controller structure with HTML templates</li>
         <li>The list method is poorly optimized by making a query to S3 on each file to get the original file name stored in tag/metadata. To resolve this I would add a parallel data repository/database in order to make a single call to the resource for faster performance.</li>
-        <li>There is logic for a <b>token with Expiration</b> on branch <a target="_blank" href="https://github.com/Jazaret/go-fileweb/tree/AccessToken-With-Expiration">https://github.com/Jazaret/go-fileweb/tree/AccessToken-With-Expiration</a>. Implementation was incomplete due to time. Has hardcoded expiry time of 7 days. Also would have liked to implement access using both file ID and file access token ID, but that was not part of specifications. </li>
+        <li>There is logic for a <b>token with Expiration</b> on branch <a target="_blank" href="https://github.com/Jazaret/go-fileweb/tree/AccessToken-With-Expiration">https://github.com/Jazaret/go-fileweb/tree/AccessToken-With-Expiration</a>. Implementation was not merged due to time. Has hardcoded expiry time of 7 days. Also would have liked to implement access using both file ID and file access token ID, but that was not part of specifications. </li>
         <li>There is no consideration as to uploading a duplicate file. We can check the file name as well as a checksum or hash stored on a seperate queriable repository to ensure that users are not uploading the same file repeatedly. </li>
         <li>Downloads and Uploads for very large files is not taken under considerations. </li>
     </ul>
